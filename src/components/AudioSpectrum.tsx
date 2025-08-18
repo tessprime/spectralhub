@@ -15,10 +15,12 @@ export function AudioSpectrum({ selectedMicrophone }: AudioSpectrumProps) {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const animationRef = useRef<number>(0);
-  const [spectrumHistory, setSpectrumHistory] = useState<SpectrumData[]>([]);
+  //const [spectrumHistory, setSpectrumHistory] = useState<SpectrumData[]>([]);
+  const spectrumHistory = useRef<SpectrumData[]>([]);
   const [isActive, setIsActive] = useState(false);
+  const colorRef = useRef<string>('#00ff00'); // Default color for spectrum bars
 
-  const HISTORY_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
+  const HISTORY_DURATION = .5; // 5 minutes in milliseconds
   const FFT_SIZE = 2048;
   const CANVAS_WIDTH = 800;
   const CANVAS_HEIGHT = 400;
@@ -97,17 +99,15 @@ export function AudioSpectrum({ selectedMicrophone }: AudioSpectrumProps) {
       frequencies: Array.from(dataArray)
     };
 
-    setSpectrumHistory(prev => {
-      const updated = [...prev, newSpectrumData];
-      // Remove data older than 5 minutes
-      return updated.filter(data => now - data.timestamp <= HISTORY_DURATION);
-    });
+    const updated = [...spectrumHistory.current, newSpectrumData];
+    // Remove data older than 5 minutes
+    spectrumHistory.current =  updated.filter(data => now - data.timestamp <= HISTORY_DURATION);
 
-    drawSpectrum(ctx, dataArray, bufferLength);
+    drawSpectrum(ctx, dataArray, bufferLength, colorRef.current);
     animationRef.current = requestAnimationFrame(animate);
   };
 
-  const drawSpectrum = (ctx: CanvasRenderingContext2D, dataArray: Uint8Array, bufferLength: number) => {
+  const drawSpectrum = (ctx: CanvasRenderingContext2D, dataArray: Uint8Array, bufferLength: number, color : string) => {
     const canvas = canvasRef.current!;
     
     // Clear canvas
@@ -121,7 +121,8 @@ export function AudioSpectrum({ selectedMicrophone }: AudioSpectrumProps) {
     draw220HzLine(ctx, bufferLength);
 
     // Draw time-based spectrum history (spectrogram)
-    drawSpectrogram(ctx);
+    console.log(dataArray);
+    drawSpectrogram(ctx, spectrumHistory.current);
   };
 
   const drawLogSpectrum = (ctx: CanvasRenderingContext2D, dataArray: Uint8Array, bufferLength: number) => {
@@ -152,7 +153,7 @@ export function AudioSpectrum({ selectedMicrophone }: AudioSpectrumProps) {
       
       if (binIndex >= 0 && binIndex < bufferLength) {
         const amplitude = dataArray[binIndex];
-        const barHeight = (amplitude / 255) * canvas.height;
+        const barHeight = (amplitude / 255) * (canvas.height - canvas.height / 3); // Leave space for spectrogram
         ctx.fillRect(pixelX, canvas.height - barHeight, 2, barHeight);
       }
     }
@@ -161,7 +162,7 @@ export function AudioSpectrum({ selectedMicrophone }: AudioSpectrumProps) {
   const draw220HzLine = (ctx: CanvasRenderingContext2D, bufferLength: number) => {
     if (!audioContextRef.current) return;
 
-    const canvas = canvasRef.current!;
+    const canvas = ctx.canvas;
     const sampleRate = audioContextRef.current.sampleRate;
     const nyquist = sampleRate / 2;
     
@@ -190,9 +191,11 @@ export function AudioSpectrum({ selectedMicrophone }: AudioSpectrumProps) {
     ctx.fillText('220Hz', x + 5, 15);
   };
 
-  const drawSpectrogram = (ctx: CanvasRenderingContext2D) => {
-    if (spectrumHistory.length === 0) return;
-
+  const drawSpectrogram = (ctx: CanvasRenderingContext2D, spectrumHistory : SpectrumData[]) => {
+    if (!spectrumHistory || spectrumHistory.length === 0) {
+      console.log("Spectrum history is empty, nothing to draw.");
+      return;
+    }
     const canvas = canvasRef.current!;
     const spectrogramHeight = canvas.height / 3; // Use bottom third for spectrogram
     const spectrogramY = canvas.height - spectrogramHeight;
@@ -207,6 +210,7 @@ export function AudioSpectrum({ selectedMicrophone }: AudioSpectrumProps) {
       if (age > timeRange) return;
 
       const x = canvas.width - (age * pixelsPerMs);
+      console.log(data);
       const freqStep = spectrogramHeight / data.frequencies.length;
 
       data.frequencies.forEach((amplitude, freqIndex) => {
