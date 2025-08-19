@@ -30,6 +30,12 @@ export function MicrophoneSelector({ selectedMicrophone, onMicrophoneChange }: M
           }));
         
         setMicrophones(audioInputs);
+        
+        // Auto-select first microphone if none is selected
+        if (audioInputs.length > 0 && !selectedMicrophone) {
+          onMicrophoneChange(audioInputs[0].deviceId);
+        }
+        
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to access microphones');

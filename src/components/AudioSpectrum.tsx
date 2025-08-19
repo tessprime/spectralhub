@@ -26,11 +26,6 @@ export function AudioSpectrum({ selectedMicrophone }: AudioSpectrumProps) {
   const CANVAS_HEIGHT = 400;
 
   useEffect(() => {
-    if (!selectedMicrophone) {
-      stopAudioAnalysis();
-      return;
-    }
-
     startAudioAnalysis();
     return () => stopAudioAnalysis();
   }, [selectedMicrophone]);
